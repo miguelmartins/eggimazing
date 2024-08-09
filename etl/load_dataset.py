@@ -12,9 +12,18 @@ class DatasetProcessor:
         self.dataset_dictionary = self._load_file_names()
 
     def _load_file_names(self):
-        dataset_files = os.listdir(self.target_directory)
+        dataset_files = sorted(os.listdir(self.target_directory))
         json_names = [x for x in dataset_files if x.endswith('.json')]
         image_names = [x for x in dataset_files if x not in json_names]
         patient_ids = np.array([x[:self.id_prefix_size] for x in json_names])
         return {pid_: [[image_ for image_ in image_names if image_.startswith(pid_)],
                        [json_ for json_ in json_names if json_.startswith(pid_)]] for pid_ in patient_ids}
+
+    def no_split(self):
+        dataset_info = []
+        for patient, (images, jsons) in self.dataset_dictionary.items():
+            for x, y in zip(images, jsons):
+                dataset_info.append([os.path.join(self.target_directory, x), os.path.join(self.target_directory, y)])
+        return dataset_info
+
+
