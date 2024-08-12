@@ -1,5 +1,9 @@
-import os
+import json
+import math
 import numpy as np
+import os
+import pandas as pd
+import tensorflow as tf
 
 
 class DatasetProcessor:
@@ -12,9 +16,82 @@ class DatasetProcessor:
         self.dataset_dictionary = self._load_file_names()
 
     def _load_file_names(self):
-        dataset_files = os.listdir(self.target_directory)
+        dataset_files = sorted(os.listdir(self.target_directory))
         json_names = [x for x in dataset_files if x.endswith('.json')]
         image_names = [x for x in dataset_files if x not in json_names]
         patient_ids = np.array([x[:self.id_prefix_size] for x in json_names])
         return {pid_: [[image_ for image_ in image_names if image_.startswith(pid_)],
                        [json_ for json_ in json_names if json_.startswith(pid_)]] for pid_ in patient_ids}
+
+    # bbox, eggim in bbox, landmark
+    def process_json(self, directory):
+        with open(directory, 'r') as file:
+            data = json.load(file)
+        dict_parameters = {}
+        for instance in data['instances']:
+            if instance['className'] == 'EGGIM in the FULL Anatomical Location':
+                dict_parameters['eggim_global'] = int(instance['attributes'][0]['name'])
+            if instance['className'] == 'EGGIM in Target Area - Square':
+                dict_parameters['eggim_square'] = int(instance['attributes'][0]['name'])
+            if instance['className'] == 'Anatomical Location':
+                dict_parameters['landmark'] = str(instance['attributes'][0]['name'])
+            if instance["type"] == "bbox" and "points" in instance:
+                points = instance["points"]
+                left = points["x1"]
+                top = points["y1"]
+                right = points["x2"]
+                bottom = points["y2"]
+                # print("x1", left, "y1", top, "x2", right, "y2", bottom)
+                dict_parameters['bbox'] = np.array([math.floor(left), math.floor(top), math.floor(right), math.floor(
+                    bottom)])  # plt.imshow(np.array(image)[round(y1):round(y2), round(x1):round(x2), :])
+        return dict_parameters
+
+    def process(self):
+        dataset_info = []
+        for patient, (images, jsons) in self.dataset_dictionary.items():
+            for x, y in zip(images, jsons):
+                annotation_data = self.process_json(os.path.join(self.target_directory, y))
+                annotation_data['image_directory'] = os.path.join(self.target_directory, x)
+                dataset_info.append(annotation_data)
+        return pd.DataFrame(dataset_info)
+
+
+def crop_image(image, bbox, crop_height=224, crop_width=224):
+    # Crop the image to the bounding box
+    cropped_image = tf.image.crop_to_bounding_box(image, bbox[1], bbox[0], crop_width, crop_width)
+
+    # Resize the cropped image to the desired size
+    resized_image = tf.image.resize(cropped_image, [crop_height, crop_width])
+    return resized_image
+
+
+def load_and_preprocess_image(image_path, bbox):
+    image = tf.io.read_file(image_path)
+    image = tf.image.decode_jpeg(image, channels=3)
+    image = crop_image(image, bbox)
+    return image
+
+
+def get_data(image_dir, eggim_square_score, bbox):
+    bbox = tf.cast(bbox, dtype=tf.int32)
+    x = tf.cast(load_and_preprocess_image(image_dir, bbox), dtype=tf.float32)
+    y = tf.cast(eggim_square_score, dtype=tf.float32)
+    return x, y
+
+
+def get_tf_eggim_patch_dataset(df: pd.DataFrame):
+    bboxes = np.stack(np.array(df['bbox'].values), axis=-1).T
+    images = df['image_directory'].values
+    eggim_square = df['eggim_square'].values
+
+    # Assuming images, eggim_square, and bboxes are defined properly somewhere in your code.
+    image_ds = tf.data.Dataset.from_tensor_slices(images)
+    eggim_square_ds = tf.data.Dataset.from_tensor_slices(eggim_square)
+    bboxes_ds = tf.data.Dataset.from_tensor_slices(bboxes)
+
+    # Combine the datasets into a single dataset
+    dataset = tf.data.Dataset.zip((image_ds, eggim_square_ds, bboxes_ds))
+
+    dataset_processed = dataset.map(lambda img, score, bbox: get_data(img, score, bbox),
+                                    num_parallel_calls=tf.data.AUTOTUNE)
+    return dataset_processed
