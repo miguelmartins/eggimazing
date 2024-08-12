@@ -59,6 +59,7 @@ class DatasetProcessor:
             df['eggim_square'] = df['eggim_square'].apply(lambda score: 0 if score == 0 else 1)
         return df
 
+    @staticmethod
     def stratified_k_splits(X, y, k=5, train_size=0.7, val_size=0.15, test_size=0.15, random_state=None):
         assert train_size + val_size + test_size == 1.0, "The sum of train, val, and test sizes must be 1.0"
         # Create k StratifiedShuffleSplit instances
@@ -96,7 +97,7 @@ def get_data(image_dir, eggim_square_score, bbox, num_classes):
     if num_classes == 2:
         y = tf.cast(eggim_square_score, dtype=tf.float32)
     else:
-        y = tf.cast(tf.one_hot(eggim_square_score, num_classes), dtype=tf.float32)
+        y = tf.one_hot(tf.cast(eggim_square_score, dtype=tf.int32), num_classes)
     return x, y
 
 
