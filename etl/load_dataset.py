@@ -82,7 +82,7 @@ def crop_image(image, bbox, crop_height=224, crop_width=224):
 
     # Resize the cropped image to the desired size
     resized_image = tf.image.resize(cropped_image, [crop_height, crop_width])
-    return resized_image
+    return tf.image.per_image_standardization(resized_image)
 
 
 def load_and_preprocess_image(image_path, bbox):
