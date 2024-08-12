@@ -8,13 +8,13 @@ from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
 
 def main():
     target_dir = '../test_files/EGGIMazing/Dataset'
-    batch_size = 16
-    num_epochs = 10
+    batch_size = 32
+    num_epochs = 100
     learning_rate = 1e-4
 
     dp = DatasetProcessor(target_dir)
     df = dp.process()
-    df = df[~df.isna().any(axis=1)].reset_index(drop=True)
+    # df = df[~df.isna().any(axis=1)].reset_index(drop=True)
     X, y = df['image_directory'], df['eggim_square']
 
     # TODO: make sure this works on one-hot-encoded
