@@ -46,7 +46,7 @@ class DatasetProcessor:
                     bottom)])  # plt.imshow(np.array(image)[round(y1):round(y2), round(x1):round(x2), :])
         return dict_parameters
 
-    def process(self, merge_eggim=False):
+    def process(self, merge_eggim_square=False):
         dataset_info = []
         for patient, (images, jsons) in self.dataset_dictionary.items():
             for x, y in zip(images, jsons):
@@ -54,8 +54,8 @@ class DatasetProcessor:
                 annotation_data['image_directory'] = os.path.join(self.target_directory, x)
                 dataset_info.append(annotation_data)
         df = pd.DataFrame(dataset_info)
-        if merge_eggim:
-            df['eggim_score'] = df['eggim_score'].apply(lambda score: 0 if score == 0 else 1)
+        if merge_eggim_square:
+            df['eggim_square'] = df['eggim_square'].apply(lambda score: 0 if score == 0 else 1)
         return df
 
 
