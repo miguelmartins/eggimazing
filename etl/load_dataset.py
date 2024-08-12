@@ -46,19 +46,22 @@ class DatasetProcessor:
                     bottom)])  # plt.imshow(np.array(image)[round(y1):round(y2), round(x1):round(x2), :])
         return dict_parameters
 
-    def process(self):
+    def process(self, merge_eggim=False):
         dataset_info = []
         for patient, (images, jsons) in self.dataset_dictionary.items():
             for x, y in zip(images, jsons):
                 annotation_data = self.process_json(os.path.join(self.target_directory, y))
                 annotation_data['image_directory'] = os.path.join(self.target_directory, x)
                 dataset_info.append(annotation_data)
-        return pd.DataFrame(dataset_info)
+        df = pd.DataFrame(dataset_info)
+        if merge_eggim:
+            df['eggim_score'] = df['eggim_score'].apply(lambda score: 0 if score == 0 else 1)
+        return df
 
 
 def crop_image(image, bbox, crop_height=224, crop_width=224):
     # Crop the image to the bounding box
-    cropped_image = tf.image.crop_to_bounding_box(image, bbox[1], bbox[0], crop_width, crop_width)
+    cropped_image = tf.image.crop_to_bounding_box(image, bbox[1], bbox[0], crop_height, crop_width)
 
     # Resize the cropped image to the desired size
     resized_image = tf.image.resize(cropped_image, [crop_height, crop_width])
