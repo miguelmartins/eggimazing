@@ -4,7 +4,7 @@ import numpy as np
 import os
 import pandas as pd
 import tensorflow as tf
-from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import StratifiedShuffleSplit, GroupShuffleSplit
 
 
 class DatasetProcessor:
@@ -67,6 +67,24 @@ class DatasetProcessor:
         sss = StratifiedShuffleSplit(n_splits=k, train_size=train_size, test_size=val_size + test_size,
                                      random_state=random_state)
         for train_idx, temp_idx in sss.split(X, y):
+            X_train, X_temp = X[train_idx], X[temp_idx]
+            y_train, y_temp = y[train_idx], y[temp_idx]
+            # Split the temp set into validation and test sets
+            sss_temp = StratifiedShuffleSplit(n_splits=1, train_size=val_size / (val_size + test_size),
+                                              test_size=test_size / (val_size + test_size), random_state=random_state)
+            val_idx, test_idx = next(sss_temp.split(X_temp, y_temp))
+            yield train_idx, val_idx, test_idx
+
+    @staticmethod
+    def group_k_splits(df, k=5, train_size=0.7, val_size=0.15, test_size=0.15, random_state=None):
+        assert train_size + val_size + test_size == 1.0, "The sum of train, val, and test sizes must be 1.0"
+        # Create k StratifiedShuffleSplit instances
+
+        sss = GroupShuffleSplit(n_splits=k, train_size=train_size, test_size=val_size + test_size,
+                                     random_state=random_state)
+        groups = df['patient_id'].values
+        X, y = df['image_directory'], df['eggim_square']
+        for train_idx, temp_idx in sss.split(X, y, groups):
             X_train, X_temp = X[train_idx], X[temp_idx]
             y_train, y_temp = y[train_idx], y[temp_idx]
             # Split the temp set into validation and test sets

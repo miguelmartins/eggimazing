@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from keras.metrics import Precision, Recall, AUC, CategoricalAccuracy
 
-from custom_models.cnns import simple_cnn
+from custom_models.cnns import simple_cnn, simple_cnn_bn
 from custom_models.optimization_utilities import get_standard_callbacks
 from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
 
@@ -38,7 +38,7 @@ def main():
     tf_test_df = tf_test_df.batch(batch_size)
 
     n_classes = 3  # Replace with the number of classes you have
-    model = simple_cnn(input_shape=(224, 224, 3), n_classes=n_classes)
+    model = simple_cnn_bn(input_shape=(224, 224, 3), n_classes=n_classes)
     # Compile the model with Adam optimizer
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
                   loss='categorical_crossentropy',
