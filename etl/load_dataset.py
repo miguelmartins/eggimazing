@@ -49,10 +49,11 @@ class DatasetProcessor:
 
     def process(self, merge_eggim_square=False):
         dataset_info = []
-        for patient, (images, jsons) in self.dataset_dictionary.items():
+        for patient_id, (images, jsons) in self.dataset_dictionary.items():
             for x, y in zip(images, jsons):
                 annotation_data = self.process_json(os.path.join(self.target_directory, y))
                 annotation_data['image_directory'] = os.path.join(self.target_directory, x)
+                annotation_data['patient_id'] = patient_id
                 dataset_info.append(annotation_data)
         df = pd.DataFrame(dataset_info)
         if merge_eggim_square:
