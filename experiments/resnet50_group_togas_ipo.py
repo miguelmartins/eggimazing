@@ -1,5 +1,7 @@
+import numpy as np
 import pandas as pd
 import tensorflow as tf
+
 from keras.applications import ResNet50
 from keras.layers import Dense, GlobalAveragePooling2D
 from keras.models import Model
@@ -17,8 +19,10 @@ def main():
 
     dp = DatasetProcessor(target_dir)
     df = dp.process()
-    df_togas = df[[x.startswith('2024') for x in df['patient_id'].values]].reset_index(drop=True)
-    df_ipo = df[[not x.startswith('2024') for x in df['patient_id'].values]].reset_index(drop=True)
+
+    togas_ids_boolean = np.array([x.startswith('PT') for x in df['patient_id'].values])
+    df_togas = df[togas_ids_boolean].reset_index(drop=True)
+    df_ipo = df[~togas_ids_boolean].reset_index(drop=True)
 
     split = dp.group_k_splits(df_togas, k=1, train_size=0.7, val_size=0.1, test_size=0.2, random_state=42)
     train_idx, val_idx, test_idx = next(split)

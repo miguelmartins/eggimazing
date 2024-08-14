@@ -8,25 +8,34 @@ from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
 
 
 def main():
-    target_dir = '../test_files/EGGIMazing/Dataset'
+    target_dir = '../../test_files/EGGIMazing/Dataset'
     batch_size = 32
-    num_epochs = 200
+    num_epochs = 100
     learning_rate = 1e-4
+    togas_split_size = 0.7
+    np.random.seed(42)
 
     dp = DatasetProcessor(target_dir)
     df = dp.process()
+    df_ipo = df[[not x.startswith('2024') for x in df['patient_id'].values]].reset_index(drop=True)
 
-    togas_ids_boolean = np.array([x.startswith('PT') for x in df['patient_id'].values])
-    df_togas = df[togas_ids_boolean].reset_index(drop=True)
+    df_togas = df[[x.startswith('2024') for x in df['patient_id'].values]].reset_index(drop=True)
+    df_togas_pids = np.unique(df_togas['patient_id'].values)
+    print(len(df_togas_pids))
+    np.random.shuffle(df_togas_pids)
 
-    split = dp.group_k_splits(df_togas, k=1, train_size=0.5, val_size=0.2, test_size=0.3, random_state=42)
-    train_idx, val_idx, test_idx = next(split)
+    id_cutoff_togas = int(togas_split_size * len(df_togas_pids))
+    print("CUTFF", id_cutoff_togas)
+    val_togas_ids, test_togas_ids = df_togas_pids[:id_cutoff_togas], df_togas_pids[:id_cutoff_togas]
+    df_val = df_togas[[x in val_togas_ids for x in df_togas['patient_id']]].reset_index(drop=True)
+    df_test = df_togas[[not x in val_togas_ids for x in df_togas['patient_id']]].reset_index(drop=True)
+
     # df_train = df.loc[train_idx]
-    tf_train_df = get_tf_eggim_patch_dataset(df_togas.loc[train_idx], num_classes=3)
-    tf_val_df = get_tf_eggim_patch_dataset(df_togas.loc[val_idx], num_classes=3)
-    tf_test_df = get_tf_eggim_patch_dataset(df_togas.loc[test_idx], num_classes=3)
-    print("train, val, test size:")
-    print(len(tf_train_df), len(tf_val_df), len(tf_test_df))
+    tf_train_df = get_tf_eggim_patch_dataset(df_ipo, num_classes=3)
+    tf_val_df = get_tf_eggim_patch_dataset(df_val, num_classes=3)
+
+    tf_test_df = get_tf_eggim_patch_dataset(df_test, num_classes=3)
+
     tf_train_df = tf_train_df.batch(batch_size)
     tf_val_df = tf_val_df.batch(batch_size)
     tf_test_df = tf_test_df.batch(batch_size)
