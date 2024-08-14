@@ -8,25 +8,31 @@ from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
 
 
 def main():
-    target_dir = '../test_files/EGGIMazing/Dataset'
+    target_dir = '../../test_files/EGGIMazing/Dataset'
     batch_size = 32
-    num_epochs = 200
+    num_epochs = 100
     learning_rate = 1e-4
 
     dp = DatasetProcessor(target_dir)
     df = dp.process()
+    df_togas = df[[x.startswith('2024') for x in df['patient_id'].values]].reset_index(drop=True)
+    df_ipo = df[[not x.startswith('2024') for x in df['patient_id'].values]].reset_index(drop=True)
+    # df = df[~df.isna().any(axis=1)].reset_index(drop=True)
+    X, y = df_togas['image_directory'], df_togas['eggim_square']
 
-    togas_ids_boolean = np.array([x.startswith('PT') for x in df['patient_id'].values])
-    df_togas = df[togas_ids_boolean].reset_index(drop=True)
-
-    split = dp.group_k_splits(df_togas, k=1, train_size=0.5, val_size=0.2, test_size=0.3, random_state=42)
+    # TODO: make sure this works on one-hot-encoded
+    # TODO: make this deterministic
+    split = dp.stratified_k_splits(X, y, k=1, train_size=0.7, val_size=0.1, test_size=0.2, random_state=42)
     train_idx, val_idx, test_idx = next(split)
+    print(val_idx)
+    internal_val_idx = np.concatenate([val_idx, test_idx])
+    print(internal_val_idx)
     # df_train = df.loc[train_idx]
     tf_train_df = get_tf_eggim_patch_dataset(df_togas.loc[train_idx], num_classes=3)
-    tf_val_df = get_tf_eggim_patch_dataset(df_togas.loc[val_idx], num_classes=3)
-    tf_test_df = get_tf_eggim_patch_dataset(df_togas.loc[test_idx], num_classes=3)
-    print("train, val, test size:")
-    print(len(tf_train_df), len(tf_val_df), len(tf_test_df))
+    tf_val_df = get_tf_eggim_patch_dataset(df_togas.loc[internal_val_idx], num_classes=3)
+
+    tf_test_df = get_tf_eggim_patch_dataset(df_ipo.loc[test_idx], num_classes=3)
+
     tf_train_df = tf_train_df.batch(batch_size)
     tf_val_df = tf_val_df.batch(batch_size)
     tf_test_df = tf_test_df.batch(batch_size)

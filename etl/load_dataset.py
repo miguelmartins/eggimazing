@@ -3,6 +3,7 @@ import math
 import numpy as np
 import os
 import pandas as pd
+import re
 import tensorflow as tf
 from sklearn.model_selection import StratifiedShuffleSplit, GroupShuffleSplit
 
@@ -36,6 +37,14 @@ class DatasetProcessor:
                 dict_parameters['eggim_square'] = int(instance['attributes'][0]['name'])
             if instance['className'] == 'Anatomical Location':
                 dict_parameters['landmark'] = str(instance['attributes'][0]['name'])
+            if instance['className'] == 'Comments':
+                if not instance['attributes']:  # check if list is empty
+                    continue
+                else:
+                    id_ = str(instance['attributes'][0]['name'])
+                    id_ = re.split(r'[ \n]+', id_)[0]
+                    if id_.startswith('PT'):  # This is necessary to mark the patients from togas
+                        dict_parameters['patient_id'] = id_
             if instance["type"] == "bbox" and "points" in instance:
                 points = instance["points"]
                 left = points["x1"]
@@ -53,7 +62,8 @@ class DatasetProcessor:
             for x, y in zip(images, jsons):
                 annotation_data = self.process_json(os.path.join(self.target_directory, y))
                 annotation_data['image_directory'] = os.path.join(self.target_directory, x)
-                annotation_data['patient_id'] = patient_id
+                if 'patient_id' not in annotation_data:
+                    annotation_data['patient_id'] = patient_id
                 dataset_info.append(annotation_data)
         df = pd.DataFrame(dataset_info)
         if merge_eggim_square:
@@ -121,7 +131,8 @@ def get_data(image_dir, eggim_square_score, bbox, num_classes, preprocess_fn=tf.
     return x, y
 
 
-def get_tf_eggim_patch_dataset(df: pd.DataFrame, num_classes: int = 2, preprocess_fn=tf.image.per_image_standardization):
+def get_tf_eggim_patch_dataset(df: pd.DataFrame, num_classes: int = 2,
+                               preprocess_fn=tf.image.per_image_standardization):
     bboxes = np.stack(np.array(df['bbox'].values), axis=-1).T
     images = df['image_directory'].values
     eggim_square = df['eggim_square'].values

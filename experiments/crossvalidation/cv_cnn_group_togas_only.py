@@ -17,8 +17,9 @@ def main():
 
     dp = DatasetProcessor(target_dir)
     df = dp.process()
-    df_togas = df[[x.startswith('2024') for x in df['patient_id'].values]].reset_index(drop=True)
-    # df = df[~df.isna().any(axis=1)].reset_index(drop=True)
+
+    togas_ids_boolean = np.array([x.startswith('PT') for x in df['patient_id'].values])
+    df_togas = df[togas_ids_boolean].reset_index(drop=True)
     X, y = df_togas['image_directory'], df_togas['eggim_square']
 
     # TODO: make sure this works on one-hot-encoded
