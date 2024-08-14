@@ -274,11 +274,13 @@ def crop_image(image, bbox, crop_height=224, crop_width=224):
     return resized_image
 
 
-def load_and_preprocess_image(image_path, bbox, preprocess_fn=tf.image.per_image_standardization):
+def load_and_preprocess_image(image_path, bbox, augmentation_fn=None, preprocess_fn=tf.image.per_image_standardization):
     image = tf.io.read_file(image_path)
     image = tf.image.decode_jpeg(image, channels=3)
     image = crop_image(image, bbox)
     image = preprocess_fn(image)
+    if augmentation_fn is not None:
+        image = augmentation_fn(image)
     return image
 
 
