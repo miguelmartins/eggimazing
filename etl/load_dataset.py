@@ -43,9 +43,8 @@ class DatasetProcessor:
                 else:
                     id_ = str(instance['attributes'][0]['name'])
                     id_ = re.split(r'[ \n]+', id_)[0]
-                    if id_.startswith('PT'):
+                    if id_.startswith('PT'):  # This is necessary to mark the patients from togas
                         dict_parameters['patient_id'] = id_
-                        print("ID:", id_)
             if instance["type"] == "bbox" and "points" in instance:
                 points = instance["points"]
                 left = points["x1"]
