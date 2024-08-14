@@ -1,9 +1,10 @@
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from keras.metrics import Precision, Recall, AUC, CategoricalAccuracy
 
-from custom_models.augmentation import augmentation
-from custom_models.cnns import simple_cnn, simple_cnn_bn
+from custom_models.cnns import simple_cnn_bn
+from custom_models.augmentation import basic_augmentation
 from custom_models.optimization_utilities import get_standard_callbacks
 from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
 
@@ -11,20 +12,24 @@ from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
 def main():
     target_dir = '../../test_files/EGGIMazing/Dataset'
     batch_size = 32
-    num_epochs = 100
+    num_epochs = 400
     learning_rate = 1e-4
     num_folds = 5
-    name = f'cnn_togas_only_cv_{num_folds}'
+    name = f'cnn_da_togasipo_cv_{num_folds}'
 
     dp = DatasetProcessor(target_dir)
     df = dp.process()
 
     togas_ids_boolean = np.array([x.startswith('PT') for x in df['patient_id'].values])
     df_togas = df[togas_ids_boolean].reset_index(drop=True)
+    df_ipo = df[~togas_ids_boolean].reset_index(drop=True)
 
     split = dp.group_k_splits(df_togas, k=num_folds, train_size=0.7, val_size=0.1, test_size=0.2, random_state=42)
     for fold, (train_idx, val_idx, test_idx) in enumerate(split):
-        tf_train_df = get_tf_eggim_patch_dataset(df_togas.loc[train_idx], num_classes=3, augmentation_fn=augmentation)
+        df_togas_train = df_togas.loc[train_idx]
+        df_train = pd.concat([df_ipo, df_togas_train], axis=0)
+
+        tf_train_df = get_tf_eggim_patch_dataset(df_train, num_classes=3, augmentation_fn=basic_augmentation)
         tf_val_df = get_tf_eggim_patch_dataset(df_togas.loc[val_idx], num_classes=3)
         tf_test_df = get_tf_eggim_patch_dataset(df_togas.loc[test_idx], num_classes=3)
 

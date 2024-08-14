@@ -3,6 +3,10 @@ import tensorflow as tf
 from keras.metrics import Precision, Recall, AUC, CategoricalAccuracy
 
 from custom_models.cnns import simple_cnn_bn
+<<<<<<< HEAD
+=======
+from custom_models.augmentation import augmentation
+>>>>>>> 95b9264 (Add support for data augmentation and base resnet50)
 from custom_models.optimization_utilities import get_standard_callbacks
 from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
 
@@ -21,9 +25,6 @@ def main():
     togas_ids_boolean = np.array([x.startswith('PT') for x in df['patient_id'].values])
     df_togas = df[togas_ids_boolean].reset_index(drop=True)
     df_ipo = df[~togas_ids_boolean].reset_index(drop=True)
-    # df = df[~df.isna().any(axis=1)].reset_index(drop=True)
-    X, y = df_togas['image_directory'], df_togas['eggim_square']
-
     # TODO: make sure this works on one-hot-encoded
     # TODO: make this deterministic
     split = dp.smarter_multiple_ds_group_k_splits(df_togas,
@@ -44,7 +45,7 @@ def main():
 
         n_classes = 3  # Replace with the number of classes you have
         model = simple_cnn_bn(input_shape=(224, 224, 3), n_classes=n_classes)
-        # Compile the model with Adam optimizer
+        # Compile the model with Adam optimizer 13:21
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
                       loss='categorical_crossentropy',
                       metrics=[CategoricalAccuracy(name='cat_accuracy'), Precision(name='precision'),
