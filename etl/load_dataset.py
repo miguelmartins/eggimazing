@@ -197,8 +197,10 @@ class DatasetProcessor:
         Togas is subject to 2 splits. The first is a group split that generates k-folds of non-identical
         sets [temp_togas, test_togas]_k. Then each  temp_togas_i (i from 1 to k) will be stratified into inter_train_size% train
         and validation [train_togas, val_togas, test_togas]_k.
-        We will concatenate the entirety of IPO only to each train_togas_i. This ensures that validation comes only from togas
-        and is representative of distribution of temp_togas since due to stratification .
+        We will then SUBSAMPLE IPO with respect to the target variable of train_togas to augment train_togas_i.
+        This ensures that validation comes only from togas
+        and that the representative of distribution of the splits are representative with regards to the target variable
+         distribtion in df_target.
         """
         assert train_size + test_size == 1.0
         assert (0 < internal_train_size) and (internal_train_size < 1)
