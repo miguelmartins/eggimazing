@@ -86,21 +86,82 @@ class DatasetProcessor:
             yield train_idx, val_idx, test_idx
 
     @staticmethod
-    def group_k_splits(df, k=5, train_size=0.7, val_size=0.15, test_size=0.15, random_state=None):
-        assert train_size + val_size + test_size == 1.0, "The sum of train, val, and test sizes must be 1.0"
+    def naive_group_k_splits(df_target,
+                             df_extra,
+                             k=5,
+                             train_size=0.7,
+                             test_size=0.3,
+                             internal_train_size=0.8,
+                             target_column='eggim_square',
+                             random_state=None):
+        assert train_size + test_size == 1.0
+        assert (0 < internal_train_size) and (internal_train_size < 1)
+        '''
+        Train and validation are from a stratified split from TOGAS+IPO. This means
+        that we have no control on how many patients from TOGAS are in each validation set
+        '''
+
         # Create k StratifiedShuffleSplit instances
-        gss = GroupShuffleSplit(n_splits=k, train_size=train_size, test_size=val_size + test_size,
+        gss = GroupShuffleSplit(n_splits=k, train_size=train_size, test_size=test_size,
                                 random_state=random_state)
-        groups = df['patient_id'].values
-        X, y = df['image_directory'], df['eggim_square']
+        groups = df_target['patient_id'].values
+        X = df_target.drop(columns=[target_column])
+        y = df_target[target_column]
         for temp_idx, test_idx in gss.split(X, y, groups):
-            X_temp = X[temp_idx]
-            y_temp = y[temp_idx]
+            df_temp = df_target.iloc[temp_idx]
+            df_test = df_target.iloc[test_idx]
+            df_joint = pd.concat([df_temp, df_extra], axis=0)
+
+            X_train = df_joint.drop(columns=[target_column])
+            y_train = df_joint[target_column]
             # Split the temp set into validation and test sets
-            sss_temp = StratifiedShuffleSplit(n_splits=1, train_size=train_size / (train_size + val_size),
-                                              test_size=val_size / (train_size + val_size), random_state=random_state)
+            sss_temp = StratifiedShuffleSplit(n_splits=1, train_size=internal_train_size,
+                                              test_size=1. - internal_train_size, random_state=random_state)
+            train_idx, val_idx = next(sss_temp.split(X_train, y_train))
+
+            df_train = df_joint.iloc[train_idx]
+            df_val = df_joint.iloc[val_idx]
+
+            yield df_train, df_val, df_test
+
+    @staticmethod
+    def smart_group_k_splits(df_target,
+                              df_extra,
+                              k=5,
+                              train_size=0.7,
+                              test_size=0.3,
+                              internal_train_size=0.5,
+                              target_column='eggim_square',
+                              random_state=None):
+        """
+        Togas is subject to 2 splits. The first is a group split that generates k-folds of non-identical
+        sets [temp_togas, test_togas]_k. Then each  temp_togas_i (i from 1 to k) will be stratified into inter_train_size% train
+        and validation [train_togas, val_togas, test_togas]_k.
+        We will concatenate the entirety of IPO only to each train_togas_i. This ensures that validation comes only from togas
+        and is representative of distribution of temp_togas since due to stratification .
+        """
+        assert train_size + test_size == 1.0
+        assert (0 < internal_train_size) and (internal_train_size < 1)
+        # Create k StratifiedShuffleSplit instances
+        gss = GroupShuffleSplit(n_splits=k, train_size=train_size, test_size=test_size,
+                                random_state=random_state)
+        groups = df_target['patient_id'].values
+        X = df_target.drop(columns=[target_column])
+        y = df_target[target_column]
+        for temp_idx, test_idx in gss.split(X, y, groups):
+            df_temp = df_target.iloc[temp_idx]
+            df_test = df_target.iloc[test_idx]
+
+            X_temp = df_temp.drop(columns=[target_column])
+            y_temp = df_temp[target_column]
+            sss_temp = StratifiedShuffleSplit(n_splits=1, train_size=internal_train_size,
+                                              test_size=1. - internal_train_size, random_state=random_state)
             train_idx, val_idx = next(sss_temp.split(X_temp, y_temp))
-            yield train_idx, val_idx, test_idx
+
+            df_train = df_target.iloc[train_idx]
+            df_train = pd.concat([df_train, df_extra], axis=0)
+            df_val = df_target.iloc[val_idx]
+            yield df_train, df_val, df_test
 
 
 def crop_image(image, bbox, crop_height=224, crop_width=224):
