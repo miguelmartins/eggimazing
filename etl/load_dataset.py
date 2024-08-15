@@ -125,7 +125,7 @@ class DatasetProcessor:
                                          k=5,
                                          train_size=0.7,
                                          test_size=0.3,
-                                         internal_train_size=0.8,
+                                         internal_train_size=0.5,
                                          target_column='eggim_square',
                                          random_state=None):
         assert train_size + test_size == 1.0
