@@ -57,7 +57,7 @@ class DatasetProcessor:
                     bottom)])  # plt.imshow(np.array(image)[round(y1):round(y2), round(x1):round(x2), :])
         return dict_parameters
 
-    def process(self, merge_eggim_square=False):
+    def process(self, merge_eggim_square=False, merge_eggim_global=False):
         dataset_info = []
         for patient_id, (images, jsons) in self.dataset_dictionary.items():
             for x, y in zip(images, jsons):
@@ -69,6 +69,8 @@ class DatasetProcessor:
         df = pd.DataFrame(dataset_info)
         if merge_eggim_square:
             df['eggim_square'] = df['eggim_square'].apply(lambda score: 0 if score == 0 else 1)
+        if merge_eggim_global:
+            df['eggim_global'] = df['eggim_global'].apply(lambda score: 0 if score == 0 else 1)
         return df
 
     @staticmethod
@@ -281,8 +283,15 @@ def load_and_preprocess_image(image_path, bbox):
     return image
 
 
-def get_data(image_dir, eggim_square_score, bbox, num_classes, augmentation_fn=None,
-             preprocess_fn=tf.image.per_image_standardization):
+def load_image(image_path, resize_height=224, resize_width=224):
+    image = tf.io.read_file(image_path)
+    image = tf.image.decode_jpeg(image, channels=3)
+    image = tf.image.resize(image, (resize_height, resize_width))
+    return image
+
+
+def get_data_patch(image_dir, eggim_square_score, bbox, num_classes, augmentation_fn=None,
+                   preprocess_fn=tf.image.per_image_standardization):
     bbox = tf.cast(bbox, dtype=tf.int32)
     x = tf.cast(load_and_preprocess_image(image_dir, bbox), dtype=tf.float32)
     x = preprocess_fn(x)
@@ -292,6 +301,19 @@ def get_data(image_dir, eggim_square_score, bbox, num_classes, augmentation_fn=N
         y = tf.cast(eggim_square_score, dtype=tf.float32)
     else:
         y = tf.one_hot(tf.cast(eggim_square_score, dtype=tf.int32), num_classes)
+    return x, y
+
+
+def get_data(image_dir, eggim_score, num_classes, augmentation_fn=None,
+             preprocess_fn=tf.image.per_image_standardization):
+    x = tf.cast(load_image(image_dir), dtype=tf.float32)
+    x = preprocess_fn(x)
+    if augmentation_fn is not None:
+        x = augmentation_fn(x)
+    if num_classes == 2:
+        y = tf.cast(eggim_score, dtype=tf.float32)
+    else:
+        y = tf.one_hot(tf.cast(eggim_score, dtype=tf.int32), num_classes)
     return x, y
 
 
@@ -309,11 +331,32 @@ def get_tf_eggim_patch_dataset(df: pd.DataFrame, num_classes: int = 2, augmentat
     # Combine the datasets into a single dataset
     dataset = tf.data.Dataset.zip((image_ds, eggim_square_ds, bboxes_ds))
 
-    dataset_processed = dataset.map(lambda img, score, bbox: get_data(img,
-                                                                      score,
-                                                                      bbox,
-                                                                      num_classes,
-                                                                      augmentation_fn=augmentation_fn,
-                                                                      preprocess_fn=preprocess_fn),
+    dataset_processed = dataset.map(lambda img, score, bbox: get_data_patch(img,
+                                                                            score,
+                                                                            bbox,
+                                                                            num_classes,
+                                                                            augmentation_fn=augmentation_fn,
+                                                                            preprocess_fn=preprocess_fn),
+                                    num_parallel_calls=tf.data.AUTOTUNE)
+    return dataset_processed
+
+
+def get_tf_eggim_full_image_dataset(df: pd.DataFrame, num_classes: int = 2, augmentation_fn=None,
+                                    preprocess_fn=tf.image.per_image_standardization):
+    images = df['image_directory'].values
+    eggim_score = df['eggim_global'].values
+
+    # Assuming images, eggim_square, and bboxes are defined properly somewhere in your code.
+    image_ds = tf.data.Dataset.from_tensor_slices(images)
+    eggim_ds = tf.data.Dataset.from_tensor_slices(eggim_score)
+
+    # Combine the datasets into a single dataset
+    dataset = tf.data.Dataset.zip((image_ds, eggim_ds))
+
+    dataset_processed = dataset.map(lambda img, score: get_data(img,
+                                                                score,
+                                                                num_classes,
+                                                                augmentation_fn=augmentation_fn,
+                                                                preprocess_fn=preprocess_fn),
                                     num_parallel_calls=tf.data.AUTOTUNE)
     return dataset_processed
