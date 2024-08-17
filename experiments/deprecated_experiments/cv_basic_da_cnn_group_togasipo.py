@@ -15,7 +15,7 @@ def main():
     num_epochs = 400
     learning_rate = 1e-4
     num_folds = 5
-    name = f'../../logs/cnn_basic_da_togasipo_cv_{num_folds}'
+    name = f'../../logs/cnn_da_togasipo_cv_{num_folds}'
 
     dp = DatasetProcessor(target_dir)
     df = dp.process()
