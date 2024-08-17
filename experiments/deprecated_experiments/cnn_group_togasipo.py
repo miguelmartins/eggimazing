@@ -1,4 +1,4 @@
-import numpy as np
+import pandas as pd
 import tensorflow as tf
 from keras.metrics import Precision, Recall, AUC, CategoricalAccuracy
 
@@ -8,28 +8,28 @@ from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
 
 
 def main():
-    target_dir = '../test_files/EGGIMazing/Dataset'
+    target_dir = '../../test_files/EGGIMazing/Dataset'
     batch_size = 32
-    num_epochs = 100
+    num_epochs = 200
     learning_rate = 1e-4
 
     dp = DatasetProcessor(target_dir)
     df = dp.process()
-
     togas_ids_boolean = np.array([x.startswith('PT') for x in df['patient_id'].values])
     df_togas = df[togas_ids_boolean].reset_index(drop=True)
+    df_ipo = df[~togas_ids_boolean].reset_index(drop=True)
 
-    X, y = df_togas['image_directory'], df_togas['eggim_square']
-
-    # TODO: make sure this works on one-hot-encoded
-    # TODO: make this deterministic
-    split = dp.stratified_k_splits(X, y, k=1, train_size=0.7, val_size=0.1, test_size=0.2, random_state=42)
+    split = dp.group_k_splits(df_togas, k=1, train_size=0.7, val_size=0.1, test_size=0.2, random_state=42)
     train_idx, val_idx, test_idx = next(split)
     # df_train = df.loc[train_idx]
-    tf_train_df = get_tf_eggim_patch_dataset(df_togas.loc[train_idx], num_classes=3)
+    df_togas_train = df_togas.loc[train_idx]
+    df_train = pd.concat([df_ipo, df_togas_train], axis=0)
+
+    tf_train_df = get_tf_eggim_patch_dataset(df_train, num_classes=3)
     tf_val_df = get_tf_eggim_patch_dataset(df_togas.loc[val_idx], num_classes=3)
     tf_test_df = get_tf_eggim_patch_dataset(df_togas.loc[test_idx], num_classes=3)
-
+    print("train, val, test size:")
+    print(len(tf_train_df), len(tf_val_df), len(tf_test_df))
     tf_train_df = tf_train_df.batch(batch_size)
     tf_val_df = tf_val_df.batch(batch_size)
     tf_test_df = tf_test_df.batch(batch_size)

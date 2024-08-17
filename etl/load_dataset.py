@@ -274,17 +274,20 @@ def crop_image(image, bbox, crop_height=224, crop_width=224):
     return resized_image
 
 
-def load_and_preprocess_image(image_path, bbox, preprocess_fn=tf.image.per_image_standardization):
+def load_and_preprocess_image(image_path, bbox):
     image = tf.io.read_file(image_path)
     image = tf.image.decode_jpeg(image, channels=3)
     image = crop_image(image, bbox)
-    image = preprocess_fn(image)
     return image
 
 
-def get_data(image_dir, eggim_square_score, bbox, num_classes, preprocess_fn=tf.image.per_image_standardization):
+def get_data(image_dir, eggim_square_score, bbox, num_classes, augmentation_fn=None,
+             preprocess_fn=tf.image.per_image_standardization):
     bbox = tf.cast(bbox, dtype=tf.int32)
-    x = tf.cast(load_and_preprocess_image(image_dir, bbox, preprocess_fn=preprocess_fn), dtype=tf.float32)
+    x = tf.cast(load_and_preprocess_image(image_dir, bbox), dtype=tf.float32)
+    x = preprocess_fn(x)
+    if augmentation_fn is not None:
+        x = augmentation_fn(x)
     if num_classes == 2:
         y = tf.cast(eggim_square_score, dtype=tf.float32)
     else:
@@ -292,7 +295,7 @@ def get_data(image_dir, eggim_square_score, bbox, num_classes, preprocess_fn=tf.
     return x, y
 
 
-def get_tf_eggim_patch_dataset(df: pd.DataFrame, num_classes: int = 2,
+def get_tf_eggim_patch_dataset(df: pd.DataFrame, num_classes: int = 2, augmentation_fn=None,
                                preprocess_fn=tf.image.per_image_standardization):
     bboxes = np.stack(np.array(df['bbox'].values), axis=-1).T
     images = df['image_directory'].values
@@ -306,6 +309,11 @@ def get_tf_eggim_patch_dataset(df: pd.DataFrame, num_classes: int = 2,
     # Combine the datasets into a single dataset
     dataset = tf.data.Dataset.zip((image_ds, eggim_square_ds, bboxes_ds))
 
-    dataset_processed = dataset.map(lambda img, score, bbox: get_data(img, score, bbox, num_classes, preprocess_fn),
+    dataset_processed = dataset.map(lambda img, score, bbox: get_data(img,
+                                                                      score,
+                                                                      bbox,
+                                                                      num_classes,
+                                                                      augmentation_fn=augmentation_fn,
+                                                                      preprocess_fn=preprocess_fn),
                                     num_parallel_calls=tf.data.AUTOTUNE)
     return dataset_processed

@@ -1,7 +1,10 @@
+import tensorflow as tf
+
+from keras.src.applications import ResNet50
 from tensorflow.keras import layers, models
 
 
-def simple_cnn(input_shape=(224, 224, 3), n_classes=10):
+def simple_cnn(input_shape=(224, 224, 3), n_classes=3):
     model = models.Sequential()
 
     # First convolutional block
@@ -27,7 +30,7 @@ def simple_cnn(input_shape=(224, 224, 3), n_classes=10):
     return model
 
 
-def simple_cnn_bn(input_shape=(224, 224, 3), n_classes=10):
+def simple_cnn_bn(input_shape=(224, 224, 3), n_classes=3):
     model = models.Sequential()
 
     # First convolutional block
@@ -54,4 +57,19 @@ def simple_cnn_bn(input_shape=(224, 224, 3), n_classes=10):
 
     # Output layer with softmax activation
     model.add(layers.Dense(n_classes, activation='softmax'))
+    return model
+
+def base_resnet50(input_shape=(224, 224, 3), n_classes=3):
+    base_model = ResNet50(weights='imagenet', include_top=False, input_shape=input_shape)
+
+    # Freeze the base model
+    base_model.trainable = False
+
+    # Add custom layers on top
+    x = base_model.output
+    x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    x = tf.keras.layers.Dense(1024, activation='relu')(x)
+    predictions = tf.keras.layers.Dense(n_classes, activation='softmax')(x)
+
+    model = tf.keras.models.Model(inputs=base_model.input, outputs=predictions)
     return model
