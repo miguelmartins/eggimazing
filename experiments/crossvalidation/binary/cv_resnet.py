@@ -19,7 +19,7 @@ def main():
     num_epochs = 400
     learning_rate = 1e-4
     num_folds = 5
-    name = f'../../logs/resnet_binary_9_1{num_folds}'
+    name = f'../../../logs/resnet_binary_9_1{num_folds}'
     n_classes = 2  # Replace with the number of classes you have
     dp = DatasetProcessor(target_dir)
     df = dp.process(merge_eggim_square=True)
@@ -64,7 +64,7 @@ def main():
         tf_val_df = get_tf_eggim_patch_dataset(df_val, num_classes=n_classes,
                                                preprocess_fn=tf.keras.applications.resnet.preprocess_input)
         tf_test_df = get_tf_eggim_patch_dataset(df_test, num_classes=n_classes,
-                                               preprocess_fn=tf.keras.applications.resnet.preprocess_input)
+                                                preprocess_fn=tf.keras.applications.resnet.preprocess_input)
 
         tf_train_df = tf_train_df.batch(batch_size)
         tf_val_df = tf_val_df.batch(batch_size)

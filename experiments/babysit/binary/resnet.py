@@ -11,18 +11,16 @@ from custom_models.cnns import simple_cnn_bn
 from custom_models.augmentation import basic_augmentation, basic_plus_color_augmentation
 from custom_models.optimization_utilities import get_standard_callbacks
 from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
-
-
-
+from optimization.custom_losses import weighted_binary_crossentropy
 
 
 def main():
-    target_dir = '../test_files/EGGIMazing/Dataset'
+    target_dir = '../../../test_files/EGGIMazing/Dataset'
     batch_size = 32
-    num_epochs = 100
+    num_epochs = 400
     learning_rate = 1e-4
     num_folds = 5
-    name = f'../logs/cnn_basic_no_da_togasipo_cv_{num_folds}'
+    name = f'../../../logs/cnn_basic_no_da_togasipo_cv_{num_folds}'
     n_classes = 2  # Replace with the number of classes you have
     dp = DatasetProcessor(target_dir)
     df = dp.process(merge_eggim_square=True)
@@ -55,20 +53,6 @@ def main():
     class_weights_manual = {i: len(y_train) / (len(class_counts) * class_counts[i]) for i in range(len(class_counts))}
     # Convert the class weights dictionary to a tensor
     weights = tf.constant(list(class_weights_manual.values()), dtype=tf.float32)
-    print("Weights", weights)
-    # Custom loss function that applies the weights
-    def weighted_binary_crossentropy(class_weights):
-        def loss(y_true, y_pred):
-            # Calculate binary crossentropy
-            bce = tf.keras.losses.binary_crossentropy(y_true, y_pred)
-
-            # Get class weights
-            weights = y_true * class_weights[1] + (1 - y_true) * class_weights[0]
-
-            # Multiply the loss by the class weights
-            return bce * weights
-
-        return loss
 
     tf_train_df = get_tf_eggim_patch_dataset(df_train, num_classes=n_classes, augmentation_fn=basic_plus_color_augmentation)
     tf_val_df = get_tf_eggim_patch_dataset(df_val, num_classes=n_classes)
