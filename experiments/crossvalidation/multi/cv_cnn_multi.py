@@ -1,28 +1,24 @@
-import itertools
-
 import numpy as np
-import pandas as pd
 import tensorflow as tf
 from keras.metrics import Precision, Recall, AUC, CategoricalAccuracy
-from keras.src.metrics import BinaryAccuracy
 
-from tensorflow.keras import backend as K
-from custom_models.cnns import simple_cnn_bn, base_resnet50
-from custom_models.augmentation import basic_augmentation, basic_plus_color_augmentation
+from custom_models.augmentation import basic_plus_color_augmentation
+from custom_models.cnns import simple_cnn_bn
 from custom_models.optimization_utilities import get_standard_callbacks
 from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
+from optimization.custom_losses import weighted_categorical_crossentropy
 
 
 def main():
     target_dir = '../../../test_files/EGGIMazing/Dataset'
     batch_size = 32
-    num_epochs = 400
+    num_epochs = 100
     learning_rate = 1e-4
     num_folds = 5
-    name = f'../../../logs/resnet_binary_9_1{num_folds}'
-    n_classes = 2  # Replace with the number of classes you have
+    name = f'../../../logs/cv_cnn_multi_{num_folds}'
+
     dp = DatasetProcessor(target_dir)
-    df = dp.process(merge_eggim_square=True)
+    df = dp.process()
 
     togas_ids_boolean = np.array([x.startswith('PT') for x in df['patient_id'].values])
     df_togas = df[togas_ids_boolean].reset_index(drop=True)
@@ -31,49 +27,35 @@ def main():
     split = dp.smarter_multiple_ds_group_k_splits(df_togas,
                                                   df_ipo,
                                                   k=num_folds,
-                                                  train_size=0.9,
-                                                  test_size=0.1,
+                                                  train_size=0.6,
+                                                  test_size=0.4,
                                                   internal_train_size=0.5,
                                                   random_state=42)
-
     for fold, (df_train, df_val, df_test) in enumerate(split):
         y_train = df_train['eggim_square']
         class_counts = np.bincount(y_train)
-
-        # Compute class weights
         class_weights_manual = {i: len(y_train) / (len(class_counts) * class_counts[i]) for i in
                                 range(len(class_counts))}
-
-        # Custom loss function that applies the weights
-        def weighted_binary_crossentropy(class_weights):
-            def loss(y_true, y_pred):
-                # Calculate binary crossentropy
-                bce = tf.keras.losses.binary_crossentropy(y_true, y_pred)
-
-                # Get class weights
-                weights = y_true * class_weights[1] + (1 - y_true) * class_weights[0]
-
-                # Multiply the loss by the class weights
-                return bce * weights
-
-            return loss
-
-        tf_train_df = get_tf_eggim_patch_dataset(df_train, num_classes=n_classes,
+        weights = tf.constant(list(class_weights_manual.values()), dtype=tf.float32)
+        tf_train_df = get_tf_eggim_patch_dataset(df_train,
                                                  augmentation_fn=basic_plus_color_augmentation,
-                                                 preprocess_fn=tf.keras.applications.resnet.preprocess_input)
-        tf_val_df = get_tf_eggim_patch_dataset(df_val, num_classes=n_classes,
-                                               preprocess_fn=tf.keras.applications.resnet.preprocess_input)
-        tf_test_df = get_tf_eggim_patch_dataset(df_test, num_classes=n_classes,
-                                                preprocess_fn=tf.keras.applications.resnet.preprocess_input)
+                                                 num_classes=3)
+        tf_val_df = get_tf_eggim_patch_dataset(df_val,
+                                               num_classes=3)
+        tf_test_df = get_tf_eggim_patch_dataset(df_test,
+                                                num_classes=3)
 
         tf_train_df = tf_train_df.batch(batch_size)
         tf_val_df = tf_val_df.batch(batch_size)
         tf_test_df = tf_test_df.batch(batch_size)
 
-        model = base_resnet50(input_shape=(224, 224, 3), n_classes=n_classes)
+        n_classes = 3  # Replace with the number of classes you have
+        model = simple_cnn_bn(input_shape=(224, 224, 3), n_classes=n_classes)
+        # Compile the model with Adam optimizer 13:21
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-                      loss=weighted_binary_crossentropy(class_weights_manual),
-                      metrics=['accuracy', Precision(name='precision'), Recall(name='recall'),
+                      loss=weighted_categorical_crossentropy(weights),
+                      metrics=[CategoricalAccuracy(name='cat_accuracy'), Precision(name='precision'),
+                               Recall(name='recall'),
                                AUC(name='auc')])
 
         name_fold = name + f'fold_{fold}'
@@ -82,7 +64,6 @@ def main():
                   validation_data=tf_val_df,
                   epochs=num_epochs,
                   callbacks=callbacks)
-        # around 70 no class weight
         model.load_weights(f'{checkpoint_dir}/weights.h5')
         model.evaluate(tf_test_df)
 

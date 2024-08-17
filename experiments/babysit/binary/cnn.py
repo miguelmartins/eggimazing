@@ -11,9 +11,7 @@ from custom_models.cnns import simple_cnn_bn
 from custom_models.augmentation import basic_augmentation, basic_plus_color_augmentation
 from custom_models.optimization_utilities import get_standard_callbacks
 from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
-
-
-
+from optimization.custom_losses import weighted_binary_crossentropy
 
 
 def main():
@@ -32,12 +30,12 @@ def main():
     df_ipo = df[~togas_ids_boolean].reset_index(drop=True)
 
     split = dp.smarter_multiple_ds_group_k_splits(df_togas,
-                                                   df_ipo,
-                                                   k=num_folds,
-                                                   train_size=0.9,
-                                                   test_size=0.1,
-                                                   internal_train_size=0.5,
-                                                   random_state=42)
+                                                  df_ipo,
+                                                  k=num_folds,
+                                                  train_size=0.9,
+                                                  test_size=0.1,
+                                                  internal_train_size=0.5,
+                                                  random_state=42)
 
     test_idx = 4
     print("FOLD ", test_idx)
@@ -57,27 +55,15 @@ def main():
     weights = tf.constant(list(class_weights_manual.values()), dtype=tf.float32)
     print("Weights", weights)
     # Custom loss function that applies the weights
-    def weighted_binary_crossentropy(class_weights):
-        def loss(y_true, y_pred):
-            # Calculate binary crossentropy
-            bce = tf.keras.losses.binary_crossentropy(y_true, y_pred)
 
-            # Get class weights
-            weights = y_true * class_weights[1] + (1 - y_true) * class_weights[0]
-
-            # Multiply the loss by the class weights
-            return bce * weights
-
-        return loss
-
-    tf_train_df = get_tf_eggim_patch_dataset(df_train, num_classes=n_classes, augmentation_fn=basic_plus_color_augmentation)
+    tf_train_df = get_tf_eggim_patch_dataset(df_train, num_classes=n_classes,
+                                             augmentation_fn=basic_plus_color_augmentation)
     tf_val_df = get_tf_eggim_patch_dataset(df_val, num_classes=n_classes)
     tf_test_df = get_tf_eggim_patch_dataset(df_test, num_classes=n_classes)
 
     tf_train_df = tf_train_df.batch(batch_size)
     tf_val_df = tf_val_df.batch(batch_size)
     tf_test_df = tf_test_df.batch(batch_size)
-
 
     model = simple_cnn_bn(input_shape=(224, 224, 3), n_classes=n_classes)
     print(model.summary())
