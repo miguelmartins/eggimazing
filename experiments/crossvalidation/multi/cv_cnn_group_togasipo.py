@@ -8,7 +8,7 @@ from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
 
 
 def main():
-    target_dir = '../../test_files/EGGIMazing/Dataset'
+    target_dir = '../../../test_files/EGGIMazing/Dataset'
     batch_size = 32
     num_epochs = 400
     learning_rate = 1e-4
