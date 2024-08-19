@@ -1,14 +1,10 @@
 import itertools
 
 import numpy as np
-import pandas as pd
 import tensorflow as tf
-from keras.metrics import Precision, Recall, AUC, CategoricalAccuracy
-from keras.src.metrics import BinaryAccuracy
-
-from tensorflow.keras import backend as K
+from keras.metrics import Precision, Recall, AUC
 from custom_models.cnns import simple_cnn_bn
-from custom_models.augmentation import basic_augmentation, basic_plus_color_augmentation
+from custom_models.augmentation import basic_plus_color_augmentation, basic_augmentation
 from custom_models.optimization_utilities import get_standard_callbacks
 from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
 from optimization.custom_losses import weighted_binary_crossentropy
@@ -37,7 +33,9 @@ def main():
                                                   internal_train_size=0.5,
                                                   random_state=42)
 
-    test_idx = 4
+    test_idx = 2
+    # 1/1 [==============================] - 0s 142ms/step - loss: 0.4610 - accuracy: 0.7931 - precision: 0.9231 - recall: 0.7059 - auc: 0.9412
+
     print("FOLD ", test_idx)
     i = 0
     for df_train, df_val, df_test in split:
@@ -57,7 +55,7 @@ def main():
     # Custom loss function that applies the weights
 
     tf_train_df = get_tf_eggim_patch_dataset(df_train, num_classes=n_classes,
-                                             augmentation_fn=basic_plus_color_augmentation)
+                                             augmentation_fn=basic_augmentation)
     tf_val_df = get_tf_eggim_patch_dataset(df_val, num_classes=n_classes)
     tf_test_df = get_tf_eggim_patch_dataset(df_test, num_classes=n_classes)
 
@@ -65,21 +63,15 @@ def main():
     tf_val_df = tf_val_df.batch(batch_size)
     tf_test_df = tf_test_df.batch(batch_size)
 
-    model = simple_cnn_bn(input_shape=(224, 224, 3), n_classes=n_classes)
+    model = simple_cnn_bn(input_shape=(224, 224, 3), n_classes=n_classes, gap=True)
     print(model.summary())
-    # Compile the model with Adam optimizer
-    # simple da
-    # 3/3 [==============================] - 0s 38ms/step - loss: 0.5910 - cat_accuracy: 0.7778 - precision: 0.7805 - recall: 0.7111 - auc: 0.9097
-    # color da
-    # 3/3 [==============================] - 0s 38ms/step - loss: 0.7556 - cat_accuracy: 0.7222 - precision: 0.7733 - recall: 0.6444 - auc: 0.8593
-    # no da
-    # 3/3 [==============================] - 0s 43ms/step - loss: 0.6302 - cat_accuracy: 0.7667 - precision: 0.7791 - recall: 0.7444 - auc: 0.9096
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
                   loss=weighted_binary_crossentropy(class_weights_manual),
                   metrics=['accuracy', Precision(name='precision'), Recall(name='recall'),
                            AUC(name='auc')])
 
     name_fold = name + f'fold_{fold}'
+    print(model.summary())
     checkpoint_dir, callbacks = get_standard_callbacks(name_fold, learning_rate)
     model.fit(tf_train_df,
               validation_data=tf_val_df,
@@ -92,3 +84,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# 1/1 [==============================] - 0s 142ms/step - loss: 0.6193 - accuracy: 0.6667 - precision: 0.7647 - recall: 0.6842 - auc: 0.7416
