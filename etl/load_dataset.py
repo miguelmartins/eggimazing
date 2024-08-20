@@ -266,6 +266,35 @@ class DatasetProcessor:
 
             yield df_train, df_val, df_test
 
+    @staticmethod
+    def smarter_patient_splits(df_target,
+                               df_extra,
+                               patients_ids,
+                               internal_train_size=0.5,
+                               target_variable='eggim_square',
+                               random_state=None):
+
+        assert (0 < internal_train_size) and (internal_train_size < 1)
+        for patient_id in patients_ids:
+            test_frames_rows = df_target['patient_id'] == patient_id
+
+            df_test = df_target.loc[test_frames_rows]
+            df_temp = df_target.loc[~test_frames_rows]
+            X_temp = df_temp.drop(columns=[target_variable])
+            y_temp = df_temp[target_variable]
+            sss_temp = StratifiedShuffleSplit(n_splits=1, train_size=internal_train_size,
+                                              test_size=1. - internal_train_size, random_state=random_state)
+            train_idx, val_idx = next(sss_temp.split(X_temp, y_temp))
+
+            df_train = df_target.iloc[train_idx]
+            df_val = df_target.iloc[val_idx]
+            df_train = DatasetProcessor.augment_dataframe_stratified(df_train,
+                                                                     df_extra,
+                                                                     target_column=target_variable)
+            df_train = pd.concat([df_train, df_extra], axis=0)
+
+            yield df_train, df_val, df_test
+
 
 def crop_image(image, bbox, crop_height=224, crop_width=224):
     # Crop the image to the bounding box
