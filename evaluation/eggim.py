@@ -1,21 +1,15 @@
 import numpy as np
+import pandas as pd
+
 
 def compute_eggim_patient(patient_df, target_variable):
-    eggim_landmarks = ['proximal ant lc',
-     'proximal ant gc/pw',
-     'incisura r',
-     'distal body',
-     'upper body ant',
-     'distal lc',
-     'upper body r']
-
     df = patient_df[['landmark', target_variable]].value_counts()
     # we use index[0] to assume first landmark/score pair is correct
-    eggim_antrum_incisura = df['proximal ant lc'].index[0] + df['proximal ant gc/pw'].index[0] + df['incisura r'].index[0]
+    eggim_antrum_incisura = df['proximal ant lc'].index[0] + df['proximal ant gc/pw'].index[0] + \
+                            df['incisura r'].index[0]
     eggim_body_1 = (df['distal body'].index[0] + df['upper body ant'].index[0]) / 2
-    eggim_body_2 = (df['distal lc'].index[0]+ df['upper body r'].index[0]) / 2
+    eggim_body_2 = (df['distal lc'].index[0] + df['upper body r'].index[0]) / 2
     return eggim_antrum_incisura + eggim_body_1 + eggim_body_2
-
 
 
 def get_eggim_df(df):
@@ -24,10 +18,10 @@ def get_eggim_df(df):
     for i in range(len(patient_ids)):
         try:
             eggim_square = compute_eggim_patient(df[df.patient_id == patient_ids[i]],
-                                          target_variable='eggim_square')
+                                                 target_variable='eggim_square')
             eggim_global = compute_eggim_patient(df[df.patient_id == patient_ids[i]],
-                                          target_variable='eggim_global')
+                                                 target_variable='eggim_global')
             eggim_scores[patient_ids[i]] = {'eggim_square': eggim_square, 'eggim_global': eggim_global}
         except:
             continue
-    return eggim_scores
+    return pd.DataFrame(get_eggim_df(eggim_scores)).T
