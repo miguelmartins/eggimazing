@@ -25,24 +25,16 @@ def main():
     df_togas = df[togas_ids_boolean].reset_index(drop=True)
     df_ipo = df[~togas_ids_boolean].reset_index(drop=True)
 
-    split = dp.smarter_multiple_ds_group_k_splits(df_togas,
-                                                  df_ipo,
-                                                  k=num_folds,
-                                                  train_size=0.9,
-                                                  test_size=0.1,
-                                                  internal_train_size=0.5,
-                                                  random_state=42)
+    split = dp.patient_k_group_split(df_togas,
+                                     df_ipo,
+                                     k=num_folds,
+                                     train_size=0.9,
+                                     test_size=0.1,
+                                     internal_train_size=0.5,
+                                     random_state=42)
 
     test_idx = 2
-    # 1/1 [==============================] - 0s 142ms/step - loss: 0.4610 - accuracy: 0.7931 - precision: 0.9231 - recall: 0.7059 - auc: 0.9412
-
-    print("FOLD ", test_idx)
-    i = 0
-    for df_train, df_val, df_test in split:
-        if i < test_idx:
-            i += 1
-        else:
-            break
+    df_train, df_val, df_test = next(itertools.islice(split, test_idx, test_idx + 1))
     fold = 'test_fold'
     y_train = df_train['eggim_square']
     class_counts = np.bincount(y_train)

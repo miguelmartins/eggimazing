@@ -74,28 +74,35 @@ class DatasetProcessor:
         return df
 
     @staticmethod
-    def stratified_k_splits(X, y, k=5, train_size=0.7, val_size=0.15, test_size=0.15, random_state=None):
-        assert train_size + val_size + test_size == 1.0, "The sum of train, val, and test sizes must be 1.0"
-        # Create k StratifiedShuffleSplit instances
-        sss = StratifiedShuffleSplit(n_splits=k, train_size=train_size, test_size=val_size + test_size,
-                                     random_state=random_state)
-        for train_idx, temp_idx in sss.split(X, y):
-            X_train, X_temp = X[train_idx], X[temp_idx]
-            y_train, y_temp = y[train_idx], y[temp_idx]
-            # Split the temp set into validation and test sets
-            sss_temp = StratifiedShuffleSplit(n_splits=1, train_size=val_size / (val_size + test_size),
-                                              test_size=test_size / (val_size + test_size), random_state=random_state)
-            val_idx, test_idx = next(sss_temp.split(X_temp, y_temp))
-            yield train_idx, val_idx, test_idx
+    def augment_dataframe_stratified(df1, df2, target_column='eggim_square'):
+        # Step 1: Calculate the distribution of eggim_square in df1
+        distribution_df1 = df1[target_column].value_counts(normalize=True)
+
+        # Step 2: Sample from df2 according to the distribution in df1
+        sampled_df2 = pd.DataFrame()
+        for category, proportion in distribution_df1.items():
+            # Number of samples for this category
+            n_samples = int(len(df2) * proportion)
+            # Filter df2 for the specific category
+            df2_category = df2[df2[target_column] == category]
+
+            # Sample from this category
+            sampled_category = resample(df2_category, n_samples=n_samples, replace=True, random_state=42)
+
+            # Append to the sampled_df2
+            sampled_df2 = pd.concat([sampled_df2, sampled_category])
+
+        # Step 3: Combine sampled_df2 with df1
+        return pd.concat([df1, sampled_df2])
 
     @staticmethod
-    def single_ds_group_k_splits(df_target,
-                                 k=5,
-                                 train_size=0.7,
-                                 test_size=0.3,
-                                 internal_train_size=0.5,
-                                 target_column='eggim_square',
-                                 random_state=None):
+    def single_ds_patient_k_group_split(df_target,
+                                        k=5,
+                                        train_size=0.7,
+                                        test_size=0.3,
+                                        internal_train_size=0.5,
+                                        target_column='eggim_square',
+                                        random_state=None):
         assert train_size + test_size == 1.0
         assert (0 < internal_train_size) and (internal_train_size < 1)
 
@@ -122,14 +129,14 @@ class DatasetProcessor:
             yield df_train, df_val, df_test
 
     @staticmethod
-    def naive_multiple_ds_group_k_splits(df_target,
-                                         df_extra,
-                                         k=5,
-                                         train_size=0.7,
-                                         test_size=0.3,
-                                         internal_train_size=0.5,
-                                         target_column='eggim_square',
-                                         random_state=None):
+    def naive_patient_k_group_split(df_target,
+                                    df_extra,
+                                    k=5,
+                                    train_size=0.7,
+                                    test_size=0.3,
+                                    internal_train_size=0.5,
+                                    target_column='eggim_square',
+                                    random_state=None):
         assert train_size + test_size == 1.0
         assert (0 < internal_train_size) and (internal_train_size < 1)
         '''
@@ -160,76 +167,16 @@ class DatasetProcessor:
 
             yield df_train, df_val, df_test
 
-    @staticmethod
-    def augment_dataframe_stratified(df1, df2, target_column='eggim_square'):
-        # Step 1: Calculate the distribution of eggim_square in df1
-        distribution_df1 = df1[target_column].value_counts(normalize=True)
-
-        # Step 2: Sample from df2 according to the distribution in df1
-        sampled_df2 = pd.DataFrame()
-        for category, proportion in distribution_df1.items():
-            # Number of samples for this category
-            n_samples = int(len(df2) * proportion)
-            # Filter df2 for the specific category
-            df2_category = df2[df2[target_column] == category]
-
-            # Sample from this category
-            sampled_category = resample(df2_category, n_samples=n_samples, replace=True, random_state=42)
-
-            # Append to the sampled_df2
-            sampled_df2 = pd.concat([sampled_df2, sampled_category])
-
-        # Step 3: Combine sampled_df2 with df1
-        return pd.concat([df1, sampled_df2])
 
     @staticmethod
-    def smart_multiple_ds_group_k_splits(df_target,
-                                         df_extra,
-                                         k=5,
-                                         train_size=0.7,
-                                         test_size=0.3,
-                                         internal_train_size=0.5,
-                                         target_column='eggim_square',
-                                         random_state=None):
-        """
-        Togas is subject to 2 splits. The first is a group split that generates k-folds of non-identical
-        sets [temp_togas, test_togas]_k. Then each  temp_togas_i (i from 1 to k) will be stratified into inter_train_size% train
-        and validation [train_togas, val_togas, test_togas]_k.
-        We will concatenate the entirety of IPO only to each train_togas_i. This ensures that validation comes only from togas
-        and is representative of distribution of temp_togas since due to stratification .
-        """
-        assert train_size + test_size == 1.0
-        assert (0 < internal_train_size) and (internal_train_size < 1)
-        # Create k StratifiedShuffleSplit instances
-        gss = GroupShuffleSplit(n_splits=k, train_size=train_size, test_size=test_size,
-                                random_state=random_state)
-        groups = df_target['patient_id'].values
-        X = df_target.drop(columns=[target_column])
-        y = df_target[target_column]
-        for temp_idx, test_idx in gss.split(X, y, groups):
-            df_temp = df_target.iloc[temp_idx]
-            df_test = df_target.iloc[test_idx]
-
-            X_temp = df_temp.drop(columns=[target_column])
-            y_temp = df_temp[target_column]
-            sss_temp = StratifiedShuffleSplit(n_splits=1, train_size=internal_train_size,
-                                              test_size=1. - internal_train_size, random_state=random_state)
-            train_idx, val_idx = next(sss_temp.split(X_temp, y_temp))
-
-            df_train = df_target.iloc[train_idx]
-            df_train = pd.concat([df_train, df_extra], axis=0)
-            df_val = df_target.iloc[val_idx]
-            yield df_train, df_val, df_test
-
-    @staticmethod
-    def smarter_multiple_ds_group_k_splits(df_target,
-                                           df_extra,
-                                           k=5,
-                                           train_size=0.7,
-                                           test_size=0.3,
-                                           internal_train_size=0.5,
-                                           target_variable='eggim_square',
-                                           random_state=None):
+    def patient_k_group_split(df_target,
+                              df_extra,
+                              k=5,
+                              train_size=0.7,
+                              test_size=0.3,
+                              internal_train_size=0.5,
+                              target_variable='eggim_square',
+                              random_state=None):
         """
         Togas is subject to 2 splits. The first is a group split that generates k-folds of non-identical
         sets [temp_togas, test_togas]_k. Then each  temp_togas_i (i from 1 to k) will be stratified into inter_train_size% train
@@ -267,12 +214,12 @@ class DatasetProcessor:
             yield df_train, df_val, df_test
 
     @staticmethod
-    def smarter_patient_splits(df_target,
-                               df_extra,
-                               patients_ids,
-                               internal_train_size=0.5,
-                               target_variable='eggim_square',
-                               random_state=None):
+    def patient_wise_split(df_target,
+                           df_extra,
+                           patients_ids,
+                           internal_train_size=0.5,
+                           target_variable='eggim_square',
+                           random_state=None):
 
         assert (0 < internal_train_size) and (internal_train_size < 1)
         for patient_id in patients_ids:

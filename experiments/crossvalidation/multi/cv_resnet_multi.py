@@ -24,13 +24,13 @@ def main():
     df_togas = df[togas_ids_boolean].reset_index(drop=True)
     df_ipo = df[~togas_ids_boolean].reset_index(drop=True)
 
-    split = dp.smarter_multiple_ds_group_k_splits(df_togas,
-                                                  df_ipo,
-                                                  k=num_folds,
-                                                  train_size=0.6,
-                                                  test_size=0.4,
-                                                  internal_train_size=0.5,
-                                                  random_state=42)
+    split = dp.patient_k_group_split(df_togas,
+                                     df_ipo,
+                                     k=num_folds,
+                                     train_size=0.6,
+                                     test_size=0.4,
+                                     internal_train_size=0.5,
+                                     random_state=42)
     for fold, (df_train, df_val, df_test) in enumerate(split):
         tf_train_df = get_tf_eggim_patch_dataset(df_train,
                                                  num_classes=3,

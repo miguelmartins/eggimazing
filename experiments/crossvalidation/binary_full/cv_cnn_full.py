@@ -30,14 +30,14 @@ def main():
     df_togas = df[togas_ids_boolean].reset_index(drop=True)
     df_ipo = df[~togas_ids_boolean].reset_index(drop=True)
 
-    split = dp.smarter_multiple_ds_group_k_splits(df_togas,
-                                                  df_ipo,
-                                                  k=num_folds,
-                                                  train_size=0.9,
-                                                  test_size=0.1,
-                                                  internal_train_size=0.5,
-                                                  target_variable=target_variable,
-                                                  random_state=42)
+    split = dp.patient_k_group_split(df_togas,
+                                     df_ipo,
+                                     k=num_folds,
+                                     train_size=0.9,
+                                     test_size=0.1,
+                                     internal_train_size=0.5,
+                                     target_variable=target_variable,
+                                     random_state=42)
 
     for fold, (df_train, df_val, df_test) in enumerate(split):
         y_train = df_train[target_variable]

@@ -1,15 +1,15 @@
 import itertools
 
 import numpy as np
-import pandas as pd
 import tensorflow as tf
 from keras.metrics import Precision, Recall, AUC, CategoricalAccuracy
 
-from tensorflow.keras import backend as K
+
 from custom_models.cnns import simple_cnn_bn
-from custom_models.augmentation import basic_augmentation, basic_plus_color_augmentation
+from custom_models.augmentation import basic_augmentation
 from custom_models.optimization_utilities import get_standard_callbacks
 from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
+from optimization.custom_losses import weighted_categorical_crossentropy
 
 
 def main():
@@ -27,22 +27,16 @@ def main():
     df_togas = df[togas_ids_boolean].reset_index(drop=True)
     df_ipo = df[~togas_ids_boolean].reset_index(drop=True)
 
-    split = dp.smarter_multiple_ds_group_k_splits(df_togas,
-                                                  df_ipo,
-                                                  k=num_folds,
-                                                  train_size=0.6,
-                                                  test_size=0.4,
-                                                  internal_train_size=0.5,
-                                                  random_state=42)
+    split = dp.patient_k_group_split(df_togas,
+                                     df_ipo,
+                                     k=num_folds,
+                                     train_size=0.6,
+                                     test_size=0.4,
+                                     internal_train_size=0.5,
+                                     random_state=42)
 
-    test_idx = 4
-    print("FOLD ", test_idx)
-    i = 0
-    for df_train, df_val, df_test in split:
-        if i < test_idx:
-            i += 1
-        else:
-            break
+    test_idx = 1
+    df_train, df_val, df_test = next(itertools.islice(split, test_idx, test_idx + 1))
     fold = 'test_fold'
     y_train = df_train['eggim_square']
     class_counts = np.bincount(y_train)
@@ -51,19 +45,10 @@ def main():
     class_weights_manual = {i: len(y_train) / (len(class_counts) * class_counts[i]) for i in range(len(class_counts))}
     # Convert the class weights dictionary to a tensor
     weights = tf.constant(list(class_weights_manual.values()), dtype=tf.float32)
-    print("Weights", weights)
 
-    # Custom loss function that applies the weights
-    def weighted_categorical_crossentropy(y_true, y_pred):
-        # Compute the standard categorical crossentropy loss
-        cce_loss = tf.keras.losses.categorical_crossentropy(y_true, y_pred)
-
-        # Apply the weights to the loss
-        weights_applied = tf.reduce_sum(weights * y_true, axis=-1)
-
-        return cce_loss * weights_applied
-
-    tf_train_df = get_tf_eggim_patch_dataset(df_train, num_classes=3)
+    tf_train_df = get_tf_eggim_patch_dataset(df_train,
+                                             num_classes=3,
+                                             augmentation_fn=basic_augmentation)
     tf_val_df = get_tf_eggim_patch_dataset(df_val, num_classes=3)
     tf_test_df = get_tf_eggim_patch_dataset(df_test, num_classes=3)
 
@@ -73,15 +58,8 @@ def main():
 
     n_classes = 3  # Replace with the number of classes you have
     model = simple_cnn_bn(input_shape=(224, 224, 3), n_classes=n_classes)
-    # Compile the model with Adam optimizer
-    # simple da
-    # 3/3 [==============================] - 0s 38ms/step - loss: 0.5910 - cat_accuracy: 0.7778 - precision: 0.7805 - recall: 0.7111 - auc: 0.9097
-    # color da
-    # 3/3 [==============================] - 0s 38ms/step - loss: 0.7556 - cat_accuracy: 0.7222 - precision: 0.7733 - recall: 0.6444 - auc: 0.8593
-    # no da
-    # 3/3 [==============================] - 0s 43ms/step - loss: 0.6302 - cat_accuracy: 0.7667 - precision: 0.7791 - recall: 0.7444 - auc: 0.9096
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-                  loss='categorical_crossentropy',
+                  loss=weighted_categorical_crossentropy(weights),
                   metrics=[CategoricalAccuracy(name='cat_accuracy'), Precision(name='precision'), Recall(name='recall'),
                            AUC(name='auc')])
 
