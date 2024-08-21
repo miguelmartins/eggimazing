@@ -34,15 +34,7 @@ def main():
                                                   random_state=42)
 
     test_idx = 2
-    # 1/1 [==============================] - 0s 142ms/step - loss: 0.4610 - accuracy: 0.7931 - precision: 0.9231 - recall: 0.7059 - auc: 0.9412
-
-    print("FOLD ", test_idx)
-    i = 0
-    for df_train, df_val, df_test in split:
-        if i < test_idx:
-            i += 1
-        else:
-            break
+    df_train, df_val, df_test = next(itertools.islice(split, test_idx, test_idx + 1))
     fold = 'test_fold'
     y_train = df_train['eggim_square']
     class_counts = np.bincount(y_train)
