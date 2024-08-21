@@ -129,14 +129,14 @@ class DatasetProcessor:
             yield df_train, df_val, df_test
 
     @staticmethod
-    def naive_multiple_ds_group_k_splits(df_target,
-                                         df_extra,
-                                         k=5,
-                                         train_size=0.7,
-                                         test_size=0.3,
-                                         internal_train_size=0.5,
-                                         target_column='eggim_square',
-                                         random_state=None):
+    def naive_patient_k_group_split(df_target,
+                                    df_extra,
+                                    k=5,
+                                    train_size=0.7,
+                                    test_size=0.3,
+                                    internal_train_size=0.5,
+                                    target_column='eggim_square',
+                                    random_state=None):
         assert train_size + test_size == 1.0
         assert (0 < internal_train_size) and (internal_train_size < 1)
         '''
