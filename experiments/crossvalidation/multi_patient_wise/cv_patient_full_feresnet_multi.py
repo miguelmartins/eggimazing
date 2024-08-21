@@ -2,20 +2,22 @@ import numpy as np
 import tensorflow as tf
 from keras.metrics import Precision, Recall, AUC, CategoricalAccuracy
 
-from custom_models.augmentation import basic_plus_color_augmentation
+from custom_models.augmentation import basic_plus_color_augmentation, basic_augmentation
+from custom_models.bilinear_cnns import fe_resnet
 from custom_models.cnns import simple_cnn_bn, base_resnet50
 from custom_models.optimization_utilities import get_standard_callbacks
-from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset
+from etl.load_dataset import DatasetProcessor, get_tf_eggim_patch_dataset, get_tf_eggim_full_image_dataset
 from optimization.custom_losses import weighted_categorical_crossentropy
 
 
 def main():
     target_dir = '../../../test_files/EGGIMazing/Dataset'
+    patient_ids = np.load('../../../configs/test_patient_ids.npy', allow_pickle=True)
     batch_size = 32
     num_epochs = 400
     learning_rate = 1e-4
-    num_folds = 5
-    name = f'../../../logs/cv_resnet_multi_{num_folds}'
+    num_folds = len(patient_ids)
+    name = f'../../../logs/cv_patient_full_feresnet_multi_{num_folds}'
 
     dp = DatasetProcessor(target_dir)
     df = dp.process()
@@ -24,24 +26,23 @@ def main():
     df_togas = df[togas_ids_boolean].reset_index(drop=True)
     df_ipo = df[~togas_ids_boolean].reset_index(drop=True)
 
-    split = dp.patient_k_group_split(df_togas,
-                                     df_ipo,
-                                     k=num_folds,
-                                     train_size=0.6,
-                                     test_size=0.4,
-                                     internal_train_size=0.5,
-                                     random_state=42)
+    split = dp.patient_wise_split(df_togas,
+                                  df_ipo,
+                                  patient_ids,
+                                  internal_train_size=0.9,
+                                  target_variable='eggim_global',
+                                  random_state=42)
     for fold, (df_train, df_val, df_test) in enumerate(split):
-        tf_train_df = get_tf_eggim_patch_dataset(df_train,
-                                                 num_classes=3,
-                                                 augmentation_fn=basic_plus_color_augmentation,
-                                                 preprocess_fn=tf.keras.applications.resnet.preprocess_input)
-        tf_val_df = get_tf_eggim_patch_dataset(df_val,
-                                               num_classes=3,
-                                               preprocess_fn=tf.keras.applications.resnet.preprocess_input)
-        tf_test_df = get_tf_eggim_patch_dataset(df_test,
-                                                num_classes=3,
-                                                preprocess_fn=tf.keras.applications.resnet.preprocess_input)
+        tf_train_df = get_tf_eggim_full_image_dataset(df_train,
+                                                      num_classes=3,
+                                                      augmentation_fn=basic_augmentation,
+                                                      preprocess_fn=tf.keras.applications.resnet.preprocess_input)
+        tf_val_df = get_tf_eggim_full_image_dataset(df_val,
+                                                    num_classes=3,
+                                                    preprocess_fn=tf.keras.applications.resnet.preprocess_input)
+        tf_test_df = get_tf_eggim_full_image_dataset(df_test,
+                                                     num_classes=3,
+                                                     preprocess_fn=tf.keras.applications.resnet.preprocess_input)
         y_train = df_train['eggim_square']
         class_counts = np.bincount(y_train)
         class_weights_manual = {i: len(y_train) / (len(class_counts) * class_counts[i]) for i in
@@ -53,7 +54,7 @@ def main():
         tf_test_df = tf_test_df.batch(batch_size)
 
         n_classes = 3  # Replace with the number of classes you have
-        model = base_resnet50(input_shape=(224, 224, 3), n_classes=n_classes)
+        model = fe_resnet(input_shape=(224, 224, 3), n_classes=n_classes)
         # Compile the model with Adam optimizer 13:21
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
                       loss=weighted_categorical_crossentropy(weights),
