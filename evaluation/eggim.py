@@ -21,7 +21,6 @@ def get_eggim_df(df, y_preds, patient_ids):
     '''
     eggim_scores = {}
     for i, patient_id in enumerate(patient_ids):
-        print(patient_id)
         df_patient = df[df['patient_id'] == patient_id]
         df_patient['pred'] = y_preds[i]
         eggim_square = compute_eggim_patient(df_patient,
