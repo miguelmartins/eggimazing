@@ -96,13 +96,13 @@ class DatasetProcessor:
         return pd.concat([df1, sampled_df2])
 
     @staticmethod
-    def single_ds_group_k_splits(df_target,
-                                 k=5,
-                                 train_size=0.7,
-                                 test_size=0.3,
-                                 internal_train_size=0.5,
-                                 target_column='eggim_square',
-                                 random_state=None):
+    def single_ds_patient_k_group_split(df_target,
+                                        k=5,
+                                        train_size=0.7,
+                                        test_size=0.3,
+                                        internal_train_size=0.5,
+                                        target_column='eggim_square',
+                                        random_state=None):
         assert train_size + test_size == 1.0
         assert (0 < internal_train_size) and (internal_train_size < 1)
 
