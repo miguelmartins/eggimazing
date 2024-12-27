@@ -11,13 +11,13 @@ from optimization.custom_losses import weighted_categorical_crossentropy
 
 
 def main():
-    target_dir = '../../../test_files/EGGIMazing/Dataset'
-    patient_ids = np.load('../../../configs/test_patient_ids.npy', allow_pickle=True)
+    target_dir = '../Dataset'
+    patient_ids = np.load('configs/test_patient_ids.npy', allow_pickle=True)
     batch_size = 32
-    num_epochs = 400
+    num_epochs = 2
     learning_rate = 1e-4
     num_folds = len(patient_ids)
-    name = f'../../../logs/cv_patient_resnet_multi_{num_folds}'
+    name = f'../logs/cv_patient_resnet_multi_{num_folds}'
 
     dp = DatasetProcessor(target_dir)
     df = dp.process()
