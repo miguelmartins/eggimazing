@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from keras.src.applications import ResNet50
+from tensorflow.keras.applications.resnet50 import ResNet50
 from tensorflow.keras import layers, models, Input
 
 

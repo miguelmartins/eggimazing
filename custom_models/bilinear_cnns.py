@@ -1,6 +1,6 @@
 import tensorflow as tf
 from keras import Input
-from keras.src.applications import ResNet50
+from tensorflow.keras.applications.resnet50 import ResNet50
 
 from custom_models.cnns import simple_cnn_bn
 from fractal_geometry.differential_blocks import HolderExponentsLayer, LeastSquaresFittingLayer, \

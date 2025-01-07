@@ -11,6 +11,7 @@ from optimization.custom_losses import weighted_categorical_crossentropy
 
 
 def main():
+    print(tf.config.list_physical_devices('GPU'))
     target_dir = '../Dataset'
     patient_ids = np.load('configs/test_patient_ids.npy', allow_pickle=True)
     batch_size = 32

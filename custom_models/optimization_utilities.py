@@ -8,7 +8,7 @@ def get_standard_callbacks(checkpoint_name, min_lr):
     checkpoint_dir = f'{checkpoint_name}_{timestamp}'
     os.makedirs(checkpoint_dir, exist_ok=True)
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath=os.path.join(checkpoint_dir, 'weights.h5'),  # Path to save the model
+        filepath=os.path.join(checkpoint_dir, 'weights.weights.h5'),  # Path to save the model
         monitor='val_loss',  # Monitor validation loss
         save_best_only=True,  # Save only the best model
         save_weights_only=True,
