@@ -383,4 +383,4 @@ def get_valid_patient_ids(dataframe):
                         'vii' in p_lands and \
                         'viii' in p_lands:
                     valid_patients.append(p_id)
-    return p_lands
+    return valid_patients
