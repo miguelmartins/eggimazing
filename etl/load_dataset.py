@@ -167,7 +167,6 @@ class DatasetProcessor:
 
             yield df_train, df_val, df_test
 
-
     @staticmethod
     def patient_k_group_split(df_target,
                               df_extra,
@@ -210,6 +209,30 @@ class DatasetProcessor:
                                                                      df_extra,
                                                                      target_column=target_variable)
             df_train = pd.concat([df_train, df_extra], axis=0)
+
+            yield df_train, df_val, df_test
+
+    @staticmethod
+    def single_ds_patient_wise_split(df_target,
+                                     patients_ids,
+                                     internal_train_size=0.5,
+                                     target_variable='eggim_square',
+                                     random_state=None):
+
+        assert (0 < internal_train_size) and (internal_train_size < 1)
+        for patient_id in patients_ids:
+            test_frames_rows = df_target['patient_id'] == patient_id
+
+            df_test = df_target.loc[test_frames_rows]
+            df_temp = df_target.loc[~test_frames_rows]
+            X_temp = df_temp.drop(columns=[target_variable])
+            y_temp = df_temp[target_variable]
+            sss_temp = StratifiedShuffleSplit(n_splits=1, train_size=internal_train_size,
+                                              test_size=1. - internal_train_size, random_state=random_state)
+            train_idx, val_idx = next(sss_temp.split(X_temp, y_temp))
+
+            df_train = df_target.iloc[train_idx]
+            df_val = df_target.iloc[val_idx]
 
             yield df_train, df_val, df_test
 
@@ -336,3 +359,28 @@ def get_tf_eggim_full_image_dataset(df: pd.DataFrame, num_classes: int = 2, augm
                                                                 preprocess_fn=preprocess_fn),
                                     num_parallel_calls=tf.data.AUTOTUNE)
     return dataset_processed
+
+
+def get_valid_patient_ids_deprecated(dataframe, p_ids):
+    lands = [x.split('.')[0] for x in np.unique(dataframe.landmark).squeeze()]
+    valid_pids = []
+    for p_id in p_ids:
+        if set([x.split('.')[0] for x in dataframe[dataframe.patient_id == p_id].landmark]) == set(lands):
+            valid_pids.append(p_id)
+    return valid_pids
+
+
+def get_valid_patient_ids(dataframe):
+    df = dataframe.copy()
+    p_ids = list(set(df['patient_id']))
+    valid_patients = []
+    for p_id in p_ids:
+        p_lands = np.unique(df[df.patient_id == p_ids[0]].landmark).squeeze()
+        p_lands = [x.split('.')[0] for x in p_lands]
+        if 'ii' in p_lands or 'xii' in p_lands:
+            if 'ix' in p_lands or 'x' in p_lands:
+                if 'vi' in p_lands and \
+                        'vii' in p_lands and \
+                        'viii' in p_lands:
+                    valid_patients.append(p_id)
+    return valid_patients
