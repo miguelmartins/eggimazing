@@ -15,7 +15,7 @@ def main():
     target_dir = '../2025-01_EGGIM_Dataset3'
     patient_ids = np.load('configs/new_patient_ids.npy', allow_pickle=True)
     batch_size = 32
-    num_epochs = 2
+    num_epochs = 200
     learning_rate = 1e-4
     num_folds = len(patient_ids)
     name = f'../logs/cv_patient_resnet_multi_{num_folds}'
