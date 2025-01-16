@@ -12,8 +12,8 @@ from optimization.custom_losses import weighted_categorical_crossentropy
 
 def main():
     print(tf.config.list_physical_devices('GPU'))
-    target_dir = '../Dataset'
-    patient_ids = np.load('configs/test_patient_ids.npy', allow_pickle=True)
+    target_dir = '../2025-01_EGGIM_Dataset3'
+    patient_ids = np.load('configs/new_patient_ids.npy', allow_pickle=True)
     batch_size = 32
     num_epochs = 2
     learning_rate = 1e-4
@@ -69,7 +69,7 @@ def main():
                   validation_data=tf_val_df,
                   epochs=num_epochs,
                   callbacks=callbacks)
-        model.load_weights(f'{checkpoint_dir}/weights.h5')
+        model.load_weights(f'{checkpoint_dir}/weights.weights.h5')
         model.evaluate(tf_test_df)
 
 
