@@ -2,3 +2,4 @@ tensorflow[and-cuda]
 numpy==1.16.4
 pandas
 scikit-learn
+matplotlib
