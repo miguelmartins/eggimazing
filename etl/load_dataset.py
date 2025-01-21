@@ -280,7 +280,6 @@ class DatasetProcessor:
             folds.append(patients_ids[n_per_fold*i:n_per_fold*(i+1)])
         folds.append(patients_ids[n_per_fold*4:])
         for fold in folds:
-            print(fold)
             df_test = df_target.loc[df_target['patient_id'].isin(fold)]
             df_temp = df_target.loc[~df_target['patient_id'].isin(fold)]
             X_temp = df_temp.drop(columns=[target_variable])
