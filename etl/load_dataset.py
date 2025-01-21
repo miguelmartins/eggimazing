@@ -375,7 +375,7 @@ def get_valid_patient_ids(dataframe):
     p_ids = list(set(df['patient_id']))
     valid_patients = []
     for p_id in p_ids:
-        p_lands = np.unique(df[df.patient_id == p_ids[0]].landmark).squeeze()
+        p_lands = np.unique(df[df.patient_id == p_id].landmark).squeeze()
         p_lands = [x.split('.')[0] for x in p_lands]
         if 'ii' in p_lands or 'xii' in p_lands:
             if 'ix' in p_lands or 'x' in p_lands:
