@@ -5,7 +5,7 @@ import os
 import pandas as pd
 import re
 import tensorflow as tf
-from sklearn.model_selection import StratifiedShuffleSplit, GroupShuffleSplit, LeavePGroupsOut
+from sklearn.model_selection import StratifiedShuffleSplit, GroupShuffleSplit, LeavePGroupsOut, StratifiedKFold
 from sklearn.utils import resample
 
 
@@ -266,19 +266,43 @@ class DatasetProcessor:
             yield df_train, df_val, df_test
 
     @staticmethod
-    def patient_wise_split_5_fold(df_target,
+    def patient_wise_split_x_fold(df_target,
                            df_extra,
                            patients_ids,
+                           n_folds = 5,
                            internal_train_size=0.5,
                            target_variable='eggim_square',
                            random_state=None):
 
         assert (0 < internal_train_size) and (internal_train_size < 1)
-        n_per_fold = int(len(patients_ids)/5)
+        df_patients = df_target[df_target['patient_id'].isin(patients_ids)].drop(['bbox','eggim_global','image_directory'],axis=1)
+        df_patients = df_patients.drop_duplicates(subset=['patient_id','landmark'])
+        df_patients['landmark'] = df_patients['landmark'].apply(replace_landmark_name)
+
+        filtered_df = df_patients[df_patients['landmark'].isin(['ix','x'])]
+        filtered_df = filtered_df.groupby(['patient_id'], as_index=False).agg({'eggim_square' : 'mean', 'landmark' : lambda x : 'ix'})
+
+        df_patients = df_patients[~df_patients['landmark'].isin(['ix','x'])]
+
+        df_patients = pd.concat([df_patients, filtered_df])
+
+        filtered_df = df_patients[df_patients['landmark'].isin(['ii','xii'])]
+        filtered_df = filtered_df.groupby(['patient_id'], as_index=False).agg({'eggim_square' : 'mean', 'landmark' : lambda x : 'ii'})
+
+        df_patients = df_patients[~df_patients['landmark'].isin(['ii','xii'])]
+
+        df_patients = pd.concat([df_patients, filtered_df])
+
+        df_per_patient = df_patients.groupby(['patient_id'], as_index=False).sum()
+        df_per_patient['eggim_square'] = df_per_patient['eggim_square'].astype(int)
+
+        skf = StratifiedKFold(n_splits=n_folds,shuffle=False)
         folds = []
-        for i in range(4):
-            folds.append(patients_ids[n_per_fold*i:n_per_fold*(i+1)])
-        folds.append(patients_ids[n_per_fold*4:])
+        for _, (_, test_index) in enumerate(skf.split(df_per_patient['patient_id'].to_list(),df_per_patient['eggim_square'].to_list())):
+            p_list = [df_per_patient['patient_id'].to_list()[index] for index in test_index ]
+            folds.append(p_list)
+
+
         for fold in folds:
             df_test = df_target.loc[df_target['patient_id'].isin(fold)]
             df_temp = df_target.loc[~df_target['patient_id'].isin(fold)]
@@ -297,6 +321,17 @@ class DatasetProcessor:
 
             yield df_train, df_val, df_test
 
+
+def replace_landmark_name(landmark):
+    new_landmark_name = {'ii': 'ii',
+                    'ix': 'ix',
+                    'vi': 'vi',
+                    'vii': 'vii',
+                    'viii': 'viii',
+                    'x': 'x',
+                    'xii': 'xii'}
+    landmark_number = landmark.split('.')[0]
+    return new_landmark_name[landmark_number]
 
 def crop_image(image, bbox, crop_height=224, crop_width=224):
     # Crop the image to the bounding box
