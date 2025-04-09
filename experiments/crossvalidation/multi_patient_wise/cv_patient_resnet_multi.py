@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import tensorflow as tf
 from keras.metrics import Precision, Recall, AUC, CategoricalAccuracy
 
@@ -11,13 +12,16 @@ from optimization.custom_losses import weighted_categorical_crossentropy
 
 
 def main():
-    target_dir = '../../../test_files/EGGIMazing/Dataset'
-    patient_ids = np.load('../../../configs/test_patient_ids.npy', allow_pickle=True)
+    import os
+
+    os.chdir('/home/miguelmartins/Projects/eggimazing')
+    target_dir = 'test_files/EGGIMazing/Dataset3'
+    patient_ids = np.load('configs/new_patient_ids.npy', allow_pickle=True)
     batch_size = 32
     num_epochs = 400
     learning_rate = 1e-4
     num_folds = len(patient_ids)
-    name = f'../../../logs/cv_patient_resnet_multi_{num_folds}'
+    name = f'logs/embc65_new_patient_resnet_multi_{num_folds}'
 
     dp = DatasetProcessor(target_dir)
     df = dp.process()
